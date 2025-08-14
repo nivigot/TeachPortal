@@ -23,6 +23,7 @@ namespace TeachPortal.Services
         public async Task<IEnumerable<TeacherOverview>> GetTeachersAsync()
         {
             return await _dbContext.Teachers.Select(t => new TeacherOverview {
+                Id = t.Id,
                 Name = $"{t.FirstName} {t.LastName}",
                 StudentCount = t.Students.Count
             }).ToListAsync();

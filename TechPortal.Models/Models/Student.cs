@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace TechPortal.Models.Models
 {
@@ -24,6 +26,9 @@ namespace TechPortal.Models.Models
         public string Email { get; set; }
 
         public int TeacherId { get; set; }
+
+        [JsonIgnore]             
+        [ValidateNever]
         public Teacher Teacher { get; set; }
     }
 }

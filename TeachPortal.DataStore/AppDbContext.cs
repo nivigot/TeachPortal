@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TechPortal.Models.Models;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace TeachPortal.DataStore
 {
@@ -16,5 +17,11 @@ namespace TeachPortal.DataStore
 
         public DbSet<Teacher> Teachers { get; set; }
         public DbSet<Student> Students { get; set; }
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Teacher>().ToTable("Teacher", "dbo");
+            modelBuilder.Entity<Student>().ToTable("Student", "dbo");
+        }
+
     }
 }

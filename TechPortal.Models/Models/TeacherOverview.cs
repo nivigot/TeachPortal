@@ -8,6 +8,7 @@ namespace TechPortal.Models.Models
 {
     public class TeacherOverview
     {
+        public int Id { get; set; }
         public string? Name { get; set; }
         public int StudentCount { get; set; }
     }

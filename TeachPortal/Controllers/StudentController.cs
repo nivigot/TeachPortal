@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -38,13 +39,19 @@ namespace TeachPortal.Controllers
         {
             try
             {
-                var teacherId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+                if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+                var idClaim =
+                    User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                    User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+
+                if (string.IsNullOrWhiteSpace(idClaim) || !int.TryParse(idClaim, out var teacherId))
+                    return Unauthorized("Missing or invalid teacher id claim.");
+
                 var result = await _studentService.CreateStudentAsync(student, teacherId);
-                if (result == null || !result.Success)
-                {
-                    _logger.LogError("Error during student creation: {Message}", result?.Message);
-                    return StatusCode(500, result?.Message);
-                }
+                if (result == null) return StatusCode(500, "Unknown error");
+                if (!result.Success) return StatusCode(500, result.Message);
+
                 return Ok(result.Student);
             }
             catch (ArgumentNullException ex)

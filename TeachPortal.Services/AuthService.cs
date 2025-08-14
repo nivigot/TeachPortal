@@ -61,58 +61,81 @@ namespace TeachPortal.Services
             }
         }
 
-        public async Task<Result<string>> LoginAsync(LoginRequest request)
+        public async Task<Result<string>> LoginAsync(LoginRequest request, CancellationToken ct = default)
         {
             try
             {
-                if (request == null)
+                if (request is null)
                 {
-                    _logger.LogError("Invalid login request: request is null");
+                    _logger.LogWarning("Login failed: request is null.");
                     return new Result<string>(false, "Invalid login request");
                 }
 
-                _logger.LogInformation("Logging in teacher: {UserName}", request.Username);
+                var username = request.Username?.Trim();
+                var password = request.Password;
 
-                var teacher = await _dbContext.Teachers.FirstOrDefaultAsync(t => t.UserName == request.Username);
-                if (teacher == null || !BCrypt.Net.BCrypt.Verify(request.Password, teacher.PasswordHash))
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
                 {
-                    _logger.LogError("Teacher not found or invalid password: {UserName}", request.Username);
+                    _logger.LogWarning("Login failed: missing username or password.");
+                    return new Result<string>(false, "Username and password are required");
+                }
+
+                _logger.LogInformation("Login attempt for user '{UserName}'.", username);
+
+                var teacher = await _dbContext.Teachers
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.UserName == username, ct);
+
+                if (teacher is null || !BCrypt.Net.BCrypt.Verify(password, teacher.PasswordHash))
+                {
+                    _logger.LogWarning("Login failed: invalid credentials for '{UserName}'.", username);
                     return new Result<string>(false, "Invalid username or password");
                 }
 
                 var token = GenerateJwtToken(teacher);
 
-                _logger.LogInformation("Teacher logged in successfully: {UserName}", request.Username);
+                _logger.LogInformation("Login success for user '{UserName}'.", username);
                 return new Result<string>(true, "Teacher logged in successfully", token);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while logging in teacher: {UserName}", request.Username);
+                _logger.LogError(ex, "Unexpected error during login for '{UserName}'.", request?.Username);
                 return new Result<string>(false, "An error occurred while logging in the teacher");
             }
         }
 
         private string GenerateJwtToken(Teacher teacher)
         {
+            var secret = _config["Jwt:Secret"];
+            var issuer = _config["Jwt:Issuer"];
+            var audience = _config["Jwt:Audience"];
+            var expiryMinutes = int.TryParse(_config["Jwt:ExpiryMinutes"], out var m) ? m : 30;
+
+            if (string.IsNullOrWhiteSpace(secret))
+                throw new InvalidOperationException("JWT secret is not configured.");
+
             var claims = new[]
             {
-                    new Claim(ClaimTypes.Name, teacher.UserName),
-                    new Claim(ClaimTypes.Email, teacher.Email),
-                    new Claim(ClaimTypes.NameIdentifier, teacher.Id.ToString())
-                };
+        new Claim(ClaimTypes.NameIdentifier, teacher.Id.ToString()),
+        new Claim(JwtRegisteredClaimNames.Sub, teacher.Id.ToString()),
+        new Claim(ClaimTypes.Name, teacher.UserName ?? teacher.Email ?? "teacher"),
+        new Claim(ClaimTypes.Email, teacher.Email ?? string.Empty),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Secret"]));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Audience"],
+            var jwt = new JwtSecurityToken(
+                issuer: issuer,
+                audience: audience,
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(30),
+                notBefore: DateTime.UtcNow,
+                expires: DateTime.UtcNow.AddMinutes(expiryMinutes),
                 signingCredentials: creds
             );
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return new JwtSecurityTokenHandler().WriteToken(jwt);
         }
     }
 }

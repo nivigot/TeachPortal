@@ -60,7 +60,7 @@ namespace TeachPortal.Controllers
         [SwaggerResponse(500, "Error occurred while logging in.")]
         public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request)
         {
-            var result = await _authService.LoginAsync(request);
+            var result = await _authService.LoginAsync(request, CancellationToken.None);
             if (result == null || !result.Success)
             {
                 _logger.LogError("Error during login: {Message}", result?.Message);
