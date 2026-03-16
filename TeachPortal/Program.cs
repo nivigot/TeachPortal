@@ -79,13 +79,14 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
-{
     app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "TeachPortal API v1"));
-}
 
-app.UseHttpsRedirection();
+app.UseSwagger();
+app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "TeachPortal API v1"));
+
+if (app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
+
 app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
