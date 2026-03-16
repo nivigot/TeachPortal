@@ -22,7 +22,7 @@ A RESTful API for the TeachPortal application, built with ASP.NET Core 8 and Ent
 | API Docs | Swashbuckle / Swagger with Annotations |
 
 ## Solution Structure
-
+ 
 ```
 TeachPortal.sln
 ├── TeachPortal/                  # Web API host — controllers, middleware, Program.cs
