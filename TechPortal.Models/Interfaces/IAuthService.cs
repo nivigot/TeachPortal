@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TechPortal.Models.Models;
+using TeachPortal.Models.Models;
 
-namespace TechPortal.Models.Interfaces
+namespace TeachPortal.Models.Interfaces
 {
     public interface IAuthService
     {
         Task<Result<string>> SignupAsync(Teacher teacher);
-        Task<Result<string>> LoginAsync(LoginRequest request, CancellationToken ct);
+        Task<Result<string>> LoginAsync(LoginRequest request, CancellationToken ct = default);
     }
 }

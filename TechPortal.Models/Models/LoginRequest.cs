@@ -1,15 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
-namespace TechPortal.Models.Models
+namespace TeachPortal.Models.Models
 {
     public class LoginRequest
     {
-        public string Username { get; set; }
-        public string Password { get; set; }
+        [Required]
+        [StringLength(50, MinimumLength = 3)]
+        public string Username { get; set; } = string.Empty;
 
+        [Required]
+        [MinLength(6)]
+        public string Password { get; set; } = string.Empty;
     }
 }

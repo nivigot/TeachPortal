@@ -1,14 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TechPortal.Models.Models;
+using TeachPortal.Models.Models;
 
-namespace TechPortal.Models.Interfaces
+namespace TeachPortal.Models.Interfaces
 {
     public interface ITeacherService
     {
-        Task<IEnumerable<TeacherOverview>> GetTeachersAsync();
+        Task<IEnumerable<TeacherOverview>> GetTeachersAsync(CancellationToken ct = default);
     }
 }

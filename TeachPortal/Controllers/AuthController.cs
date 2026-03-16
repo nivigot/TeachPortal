@@ -1,71 +1,64 @@
-﻿using BCrypt.Net;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
-using TeachPortal.DataStore;
-using TechPortal.Models.Interfaces;
-using TechPortal.Models.Models;
+using TeachPortal.Models.Interfaces;
+using TeachPortal.Models.Models;
 
 namespace TeachPortal.Controllers
 {
     [Route("api/auth")]
     [ApiController]
-    public class AuthController : Controller
+    public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
 
         public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
-            _authService = authService;
-            _logger = logger;
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        /// <summary>
-        /// Registers a new teacher.
-        /// </summary>
-        /// <param name="teacher">The teacher to register.</param>
-        /// <returns>A response indicating the result of the registration.</returns>
-        /// <response code="200">Teacher registered successfully.</response>
-        /// <response code="400">Invalid teacher data.</response>
-        /// <response code="500">Database update error occurred while registering teacher.</response>
         [HttpPost("signup")]
-        [SwaggerOperation(Summary = "Registers a new teacher", Description = "Registers a new teacher with the provided details.")]
-        [SwaggerResponse(200, "Teacher registered successfully.")]
-        [SwaggerResponse(400, "Invalid teacher data.")]
-        [SwaggerResponse(500, "Database update error occurred while registering teacher.")]
-        public async Task<IActionResult> SignupAsync([FromBody] Teacher teacher)
+        [SwaggerOperation(Summary = "Register a new teacher", Description = "Creates a teacher account with a hashed password.")]
+        [SwaggerResponse(201, "Teacher registered successfully.")]
+        [SwaggerResponse(400, "Validation error in the request payload.")]
+        [SwaggerResponse(409, "Email or username is already registered.")]
+        [SwaggerResponse(500, "Unexpected server error.")]
+        public async Task<IActionResult> SignupAsync([FromBody] Teacher teacher, CancellationToken ct)
         {
+            if (!ModelState.IsValid)
+                return ValidationProblem(ModelState);
+
             var result = await _authService.SignupAsync(teacher);
-            if (result == null || !result.Success)
+
+            if (!result.Success)
             {
-                _logger.LogError("Error during signup: {Message}", result?.Message);
-                return StatusCode(500, result?.Message);
+                _logger.LogWarning("Signup unsuccessful: {Message}", result.Message);
+                return StatusCode(result.StatusCode, new { message = result.Message });
             }
-            return Ok(result.Message);
+
+            return StatusCode(201, new { message = result.Message });
         }
 
-        /// <summary>
-        /// Logs in a teacher.
-        /// </summary>
-        /// <param name="request">The login request containing username and password.</param>
-        /// <returns>A response indicating the result of the login.</returns>
-        /// <response code="200">Teacher logged in successfully.</response>
-        /// <response code="400">Invalid login request.</response>
-        /// <response code="500">Error occurred while logging in.</response>
         [HttpPost("login")]
-        [SwaggerOperation(Summary = "Logs in a teacher", Description = "Logs in a teacher with the provided credentials.")]
-        [SwaggerResponse(200, "Teacher logged in successfully.")]
-        [SwaggerResponse(400, "Invalid login request.")]
-        [SwaggerResponse(500, "Error occurred while logging in.")]
-        public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request)
+        [SwaggerOperation(Summary = "Log in as a teacher", Description = "Validates credentials and returns a signed JWT.")]
+        [SwaggerResponse(200, "Login successful. Returns a JWT token.")]
+        [SwaggerResponse(400, "Missing or malformed request payload.")]
+        [SwaggerResponse(401, "Invalid username or password.")]
+        [SwaggerResponse(500, "Unexpected server error.")]
+        public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request, CancellationToken ct)
         {
-            var result = await _authService.LoginAsync(request, CancellationToken.None);
-            if (result == null || !result.Success)
+            if (!ModelState.IsValid)
+                return ValidationProblem(ModelState);
+
+            var result = await _authService.LoginAsync(request, ct);
+
+            if (!result.Success)
             {
-                _logger.LogError("Error during login: {Message}", result?.Message);
-                return StatusCode(500, result?.Message);
+                _logger.LogWarning("Login unsuccessful for '{UserName}': {Message}", request.Username, result.Message);
+                return StatusCode(result.StatusCode, new { message = result.Message });
             }
+
             return Ok(result.Data);
         }
     }

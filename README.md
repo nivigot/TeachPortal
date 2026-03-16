@@ -1,166 +1,105 @@
-**TeachPortal API**
+# TeachPortal — Backend API
 
-TeachPortal is a .NET 8 Web API for managing teachers and students with JWT-based authentication. It exposes endpoints for signup, login, and simple teacher/student operations. Swagger is enabled for interactive exploration.
+A RESTful API for the TeachPortal application, built with ASP.NET Core 8 and Entity Framework Core. Handles teacher authentication, student management, and teacher overview data.
 
-<img width="1671" height="770" alt="image" src="https://github.com/user-attachments/assets/7ce006c7-41d1-4ddb-8806-4375998a8b99" />
+## Features
 
+- **JWT authentication** — BCrypt password hashing on signup; signed JWT issued on login with configurable expiry
+- **Teacher registration and login** — Full signup/login flow with proper HTTP status codes (201, 401, 409)
+- **Student management** — Authenticated teachers can add and retrieve their own students
+- **Teacher overview** — Aggregated teacher data including student counts, exposed to authorised users
+- **Role-based access control** — Teachers can only access their own student data; Admin role can access any teacher's students
+- **Swagger UI** — Interactive API documentation available in Development with Bearer token support
 
-**Features**
+## Tech Stack
 
-JWT authentication (login/signup)
+| | |
+|---|---|
+| Framework | ASP.NET Core 8 |
+| ORM | Entity Framework Core 9 (SQL Server) |
+| Auth | JWT Bearer (Microsoft.AspNetCore.Authentication.JwtBearer) |
+| Password Hashing | BCrypt.Net-Next |
+| API Docs | Swashbuckle / Swagger with Annotations |
 
-EF Core with SQL Server
+## Solution Structure
 
-Clean solution split into Models, Services, DataStore, and Web API
-
-Swagger/OpenAPI documentation
-
-CORS policy for a React client on http://localhost:3000
-
-**Tech Stack**
-
-.NET 8, ASP.NET Core Web API
-
-Entity Framework Core 8 (SQL Server provider)
-
-Microsoft.IdentityModel.Tokens, System.IdentityModel.Tokens.Jwt
-
-Swashbuckle.AspNetCore 6.6.x
-
-**Solution Layout**
-```text
-TeachPortal.sln
-│
-├─ TeachPortal                  # Web API (controllers, Program.cs, appsettings)
-│  ├─ Controllers
-│  │   ├─ AuthController.cs
-│  │   ├─ StudentController.cs
-│  │   └─ TeacherController.cs
-│  ├─ appsettings.json
-│  └─ appsettings.Development.json
-│
-├─ TeachPortal.DataStore        # EF Core DbContext and migrations
-│  └─ AppDbContext.cs
-│
-├─ TechPortal.Services          # Business logic and JWT issuance
-│  ├─ AuthService.cs
-│  ├─ StudentService.cs
-│  └─ TeacherService.cs
-│
-└─ TechPortal.Models            # DTOs, Interfaces, Entities
-   ├─ Interfaces
-   │   ├─ IAuthService.cs
-   │   ├─ IStudentService.cs
-   │   └─ ITeacherService.cs
-   └─ Models
-       ├─ LoginRequest.cs
-       ├─ Result.cs
-       ├─ Student.cs
-       ├─ Teacher.cs
-       └─ TeacherOverview.cs
 ```
-**Prerequisites**
+TeachPortal.sln
+├── TeachPortal/                  # Web API host — controllers, middleware, Program.cs
+│   └── Controllers/
+│       ├── AuthController.cs     # POST /api/auth/signup, POST /api/auth/login
+│       ├── StudentController.cs  # GET/POST /api/students  [Authorize]
+│       └── TeacherController.cs  # GET /api/teacher, GET /api/teacher/{id}/students  [Authorize]
+├── TeachPortal.Services/         # Business logic
+│   ├── AuthService.cs            # Signup, login, JWT generation
+│   ├── StudentService.cs         # Create and retrieve students
+│   └── TeacherService.cs         # Teacher overview projection
+├── TeachPortal.DataStore/        # EF Core DbContext and model configuration
+│   └── AppDbContext.cs           # Fluent API — indexes, relationships, cascade delete
+└── TechPortal.Models/            # Shared models and service interfaces
+    ├── Models/                   # Teacher, Student, LoginRequest, Result<T>, TeacherOverview
+    └── Interfaces/               # IAuthService, IStudentService, ITeacherService
+```
 
-.NET SDK 8.x
+## Getting Started
 
-SQL Server (LocalDB, SQL Express, or full SQL Server)
+### Prerequisites
 
-EF Core tools:
+- .NET 8 SDK
+- SQL Server (local or remote)
 
-dotnet tool update --global dotnet-ef
+### Configuration
 
-**Configuration**
+Add the following to `appsettings.json` (or use `dotnet user-secrets` for local development):
 
-Edit TeachPortal/appsettings.Development.json (or appsettings.json if you prefer one file):
-
+```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\\MSSQLLocalDB;Database=TeachPortal;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=True;"
+    "DefaultConnection": "Server=.;Database=TeachPortalDb;Trusted_Connection=True;TrustServerCertificate=True"
   },
   "Jwt": {
-    "Secret": "o8d7KZ0q1T9w2nQe4rYu6xF9pS3tV0mB",
-    "Issuer": "TechPortal",
-    "Audience": "https://localhost:5001",
-    "ExpiryMinutes": 480
+    "Secret": "your-secret-key-at-least-32-characters",
+    "Issuer": "TeachPortalAPI",
+    "Audience": "TeachPortalClient",
+    "ExpiryMinutes": "60"
   },
-  "AllowedHosts": "*"
+  "Cors": {
+    "AllowedOrigins": [ "http://localhost:3000" ]
+  }
 }
+```
 
+### Run the API
 
-Notes:
-
-For SQL Express: Server=localhost\\SQLEXPRESS;Database=TeachPortal;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;
-
-For full SQL Server with SQL auth: Server=localhost;Database=TeachPortal;User Id=sa;Password=...;Encrypt=True;TrustServerCertificate=True;
-
-TrustServerCertificate=True is fine for local development. For production, install a trusted cert on SQL Server and remove that flag.
-
-Ensure you are running in Development so the Development settings are used:
-
-Properties/launchSettings.json → "ASPNETCORE_ENVIRONMENT": "Development"
-
-**Database**
-
-Create the database schema using EF migrations.
-
-From the TeachPortal project directory (or the solution root with -s):
-
-if you haven't created any migrations yet
-dotnet ef migrations add Init -p TeachPortal.DataStore -s TeachPortal
-
-apply migrations to the database
-dotnet ef database update -p TeachPortal.DataStore -s TeachPortal
-
-If you prefer automatic application at startup, you can add:
-
-// Program.cs after var app = builder.Build();
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-}
-
-**Run**
-
-From the TeachPortal project:
-
+```bash
+git clone https://github.com/nivigot/TeachPortal.git
+cd TeachPortal
 dotnet restore
-dotnet run
+dotnet ef database update --project TeachPortal.DataStore --startup-project TeachPortal
+dotnet run --project TeachPortal
+```
 
+API runs at `https://localhost:7251`. Swagger UI is available at `/swagger` in Development.
 
-The API will start on the ports in launchSettings.json. Swagger UI will be available at:
+## API Endpoints
 
-https://localhost:<port>/swagger
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/signup` | None | Register a new teacher |
+| POST | `/api/auth/login` | None | Login and receive a JWT |
+| POST | `/api/students` | Bearer | Add a student to the authenticated teacher |
+| GET | `/api/students` | Bearer | Get all students for the authenticated teacher |
+| GET | `/api/teacher` | Bearer | Get all teachers with student counts |
+| GET | `/api/teacher/{id}/students` | Bearer | Get students for a specific teacher (self or Admin) |
 
-**CORS**
+## Architecture Notes
 
-Program.cs defines a CORS policy named AllowReact allowing http://localhost:3000:
+**Layered architecture** — The solution separates concerns across four projects: the API host, business logic (Services), data access (DataStore), and shared contracts (Models + Interfaces). Controllers depend only on interfaces, not concrete service implementations, enabling easy testing.
 
-builder.Services.AddCors(o =>
-{
-    o.AddPolicy("AllowReact", p =>
-        p.WithOrigins("http://localhost:3000")
-         .AllowAnyHeader()
-         .AllowAnyMethod()
-         .AllowCredentials());
-});
+**Generic Result pattern** — All service methods return `Result<T>`, which carries `Success`, `Message`, `Data`, and `StatusCode`. Controllers map this directly to the appropriate HTTP response without additional branching logic.
 
-**Authentication**
+**EF Core configuration** — Relationships, unique indexes, and cascade behaviour are all defined explicitly in `AppDbContext.OnModelCreating` using the Fluent API rather than relying solely on conventions.
 
-POST /api/auth/signup
-Create a teacher. Server hashes the password.
+## Author
 
-POST /api/auth/login
-Returns the token
-
-The token contains claims such as sub (teacher id), name, email, and jti. Send it as:
-
-Authorization: Bearer <jwt>
-
-**Notes for a React Client**
-
-Base URL: https://localhost:<api-port>/api
-
-Add Authorization: Bearer <token> header after a successful login.
-
-Keep the CORS origin aligned with your dev client URL (default is http://localhost:3000 in this template).
+Poongothai Senthurkumar — [GitHub](https://github.com/nivigot)

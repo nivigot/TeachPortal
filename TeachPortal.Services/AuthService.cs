@@ -1,17 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using TeachPortal.DataStore;
-using TechPortal.Models.Interfaces;
-using TechPortal.Models.Models;
+using TeachPortal.Models.Interfaces;
+using TeachPortal.Models.Models;
 
 namespace TeachPortal.Services
 {
@@ -32,10 +28,10 @@ namespace TeachPortal.Services
         {
             try
             {
-                if (teacher == null)
+                if (teacher is null)
                 {
-                    _logger.LogError("Invalid teacher data: teacher is null");
-                    return new Result<string>(false, "Invalid teacher data");
+                    _logger.LogWarning("Signup failed: teacher payload is null.");
+                    return new Result<string>(false, "Invalid teacher data.", statusCode: 400);
                 }
 
                 _logger.LogInformation("Registering new teacher: {UserName}, {Email}", teacher.UserName, teacher.Email);
@@ -45,19 +41,18 @@ namespace TeachPortal.Services
                 await _dbContext.Teachers.AddAsync(teacher);
                 await _dbContext.SaveChangesAsync();
 
-                _logger.LogInformation("Teacher registered successfully: {UserName}, {Email}", teacher.UserName, teacher.Email);
-
-                return new Result<string>(true, "Teacher registered successfully");
+                _logger.LogInformation("Teacher registered successfully: {UserName}", teacher.UserName);
+                return new Result<string>(true, "Teacher registered successfully.", statusCode: 201);
             }
             catch (DbUpdateException ex)
             {
-                _logger.LogError(ex, "Database update error occurred while registering teacher: {UserName}, {Email}", teacher?.UserName, teacher?.Email);
-                return new Result<string>(false, "Database update error");
+                _logger.LogError(ex, "Duplicate key violation during signup for: {UserName}, {Email}", teacher?.UserName, teacher?.Email);
+                return new Result<string>(false, "Email or username is already registered.", statusCode: 409);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while registering teacher: {UserName}, {Email}", teacher?.UserName, teacher?.Email);
-                return new Result<string>(false, "An error occurred while registering the teacher");
+                _logger.LogError(ex, "Unexpected error during signup for: {UserName}", teacher?.UserName);
+                return new Result<string>(false, "An unexpected error occurred. Please try again.", statusCode: 500);
             }
         }
 
@@ -67,40 +62,39 @@ namespace TeachPortal.Services
             {
                 if (request is null)
                 {
-                    _logger.LogWarning("Login failed: request is null.");
-                    return new Result<string>(false, "Invalid login request");
+                    _logger.LogWarning("Login attempt with null request.");
+                    return new Result<string>(false, "Invalid login request.", statusCode: 400);
                 }
 
-                var username = request.Username?.Trim();
-                var password = request.Password;
+                var username = request.Username.Trim();
 
-                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(request.Password))
                 {
-                    _logger.LogWarning("Login failed: missing username or password.");
-                    return new Result<string>(false, "Username and password are required");
+                    _logger.LogWarning("Login attempt with missing credentials.");
+                    return new Result<string>(false, "Username and password are required.", statusCode: 400);
                 }
 
-                _logger.LogInformation("Login attempt for user '{UserName}'.", username);
+                _logger.LogInformation("Login attempt for '{UserName}'.", username);
 
                 var teacher = await _dbContext.Teachers
                     .AsNoTracking()
                     .FirstOrDefaultAsync(t => t.UserName == username, ct);
 
-                if (teacher is null || !BCrypt.Net.BCrypt.Verify(password, teacher.PasswordHash))
+                if (teacher is null || !BCrypt.Net.BCrypt.Verify(request.Password, teacher.PasswordHash))
                 {
                     _logger.LogWarning("Login failed: invalid credentials for '{UserName}'.", username);
-                    return new Result<string>(false, "Invalid username or password");
+                    return new Result<string>(false, "Invalid username or password.", statusCode: 401);
                 }
 
                 var token = GenerateJwtToken(teacher);
 
-                _logger.LogInformation("Login success for user '{UserName}'.", username);
-                return new Result<string>(true, "Teacher logged in successfully", token);
+                _logger.LogInformation("Login successful for '{UserName}'.", username);
+                return new Result<string>(true, "Login successful.", token);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during login for '{UserName}'.", request?.Username);
-                return new Result<string>(false, "An error occurred while logging in the teacher");
+                return new Result<string>(false, "An unexpected error occurred. Please try again.", statusCode: 500);
             }
         }
 
@@ -109,19 +103,19 @@ namespace TeachPortal.Services
             var secret = _config["Jwt:Secret"];
             var issuer = _config["Jwt:Issuer"];
             var audience = _config["Jwt:Audience"];
-            var expiryMinutes = int.TryParse(_config["Jwt:ExpiryMinutes"], out var m) ? m : 30;
+            var expiryMinutes = int.TryParse(_config["Jwt:ExpiryMinutes"], out var m) ? m : 60;
 
             if (string.IsNullOrWhiteSpace(secret))
                 throw new InvalidOperationException("JWT secret is not configured.");
 
             var claims = new[]
             {
-        new Claim(ClaimTypes.NameIdentifier, teacher.Id.ToString()),
-        new Claim(JwtRegisteredClaimNames.Sub, teacher.Id.ToString()),
-        new Claim(ClaimTypes.Name, teacher.UserName ?? teacher.Email ?? "teacher"),
-        new Claim(ClaimTypes.Email, teacher.Email ?? string.Empty),
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-    };
+                new Claim(ClaimTypes.NameIdentifier, teacher.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, teacher.Id.ToString()),
+                new Claim(ClaimTypes.Name, teacher.UserName ?? teacher.Email),
+                new Claim(ClaimTypes.Email, teacher.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
