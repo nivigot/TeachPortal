@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
-namespace TechPortal.Models.Models
+namespace TeachPortal.Models.Models
 {
     public class Student
     {
@@ -15,20 +10,20 @@ namespace TechPortal.Models.Models
 
         [Required]
         [StringLength(50, MinimumLength = 1)]
-        public string FirstName { get; set; }
+        public string FirstName { get; set; } = string.Empty;
 
         [Required]
         [StringLength(50, MinimumLength = 1)]
-        public string LastName { get; set; }
+        public string LastName { get; set; } = string.Empty;
 
         [Required]
         [EmailAddress]
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
         public int TeacherId { get; set; }
 
-        [JsonIgnore]             
+        [JsonIgnore]
         [ValidateNever]
-        public Teacher Teacher { get; set; }
+        public Teacher Teacher { get; set; } = null!;
     }
 }

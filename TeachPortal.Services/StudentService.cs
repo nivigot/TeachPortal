@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TeachPortal.DataStore;
-using TechPortal.Models.Interfaces;
-using TechPortal.Models.Models;
+using TeachPortal.Models.Interfaces;
+using TeachPortal.Models.Models;
 
 namespace TeachPortal.Services
 {
@@ -23,42 +17,43 @@ namespace TeachPortal.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<StudentResult> CreateStudentAsync(Student student, int teacherId)
+        public async Task<Result<Student>> CreateStudentAsync(Student student, int teacherId)
         {
             try
             {
-                if (student == null)
+                if (student is null)
                 {
                     _logger.LogWarning("Attempted to create a student with null data.");
-                    return new StudentResult { Success = false, Message = "Invalid student data" };
+                    return new Result<Student>(false, "Invalid student data.", statusCode: 400);
                 }
 
                 var teacher = await _dbContext.Teachers.FindAsync(teacherId);
-                if (teacher == null)
+                if (teacher is null)
                 {
                     _logger.LogWarning("Teacher not found: {TeacherId}", teacherId);
-                    return new StudentResult { Success = false, Message = "Teacher not found" };
+                    return new Result<Student>(false, "Teacher not found.", statusCode: 404);
                 }
 
                 student.Teacher = teacher;
                 await _dbContext.Students.AddAsync(student);
                 await _dbContext.SaveChangesAsync();
 
-                _logger.LogInformation("Student registered successfully: {StudentId}", student.Id);
-                return new StudentResult { Success = true, Message = "Student registered successfully", Student = student };
+                _logger.LogInformation("Student created successfully: {StudentId} for teacher: {TeacherId}", student.Id, teacherId);
+                return new Result<Student>(true, "Student created successfully.", student, statusCode: 201);
             }
             catch (DbUpdateException ex)
             {
-                _logger.LogError(ex, "Database update error occurred while registering student: {StudentId}", student?.Id);
-                return new StudentResult { Success = false, Message = "Database update error" };
+                _logger.LogError(ex, "Database error while creating student for teacher: {TeacherId}", teacherId);
+                return new Result<Student>(false, "A database error occurred while creating the student.", statusCode: 500);
             }
         }
 
-        public async Task<IEnumerable<Student>> GetStudentsByTeacherAsync(int teacherId)
+        public async Task<IEnumerable<Student>> GetStudentsByTeacherAsync(int teacherId, CancellationToken ct = default)
         {
             return await _dbContext.Students
-                .Where(s => s.Teacher.Id == teacherId)
-                .ToListAsync();
+                .AsNoTracking()
+                .Where(s => s.TeacherId == teacherId)
+                .ToListAsync(ct);
         }
     }
 }

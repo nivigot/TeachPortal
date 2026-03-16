@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace TechPortal.Models.Models
+namespace TeachPortal.Models.Models
 {
     public class Teacher
     {
@@ -14,37 +8,21 @@ namespace TechPortal.Models.Models
 
         [Required]
         [StringLength(50, MinimumLength = 3)]
-        public string UserName { get; set; }
+        public string UserName { get; set; } = string.Empty;
 
         [Required]
         [EmailAddress]
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
         [Required]
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
 
+        [StringLength(50)]
         public string? FirstName { get; set; }
+
+        [StringLength(50)]
         public string? LastName { get; set; }
 
         public ICollection<Student>? Students { get; set; }
-
-        public void SetPassword(string password)
-        {
-            using (var sha256 = SHA256.Create())
-            {
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                PasswordHash = BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
-            }
-        }
-
-        public bool ValidatePassword(string password)
-        {
-            using (var sha256 = SHA256.Create())
-            {
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                var hash = BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
-                return hash == PasswordHash;
-            }
-        }
     }
 }
