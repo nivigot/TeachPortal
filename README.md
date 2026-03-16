@@ -9,7 +9,7 @@ A RESTful API for the TeachPortal application, built with ASP.NET Core 8 and Ent
 - **Student management** — Authenticated teachers can add and retrieve their own students
 - **Teacher overview** — Aggregated teacher data including student counts, exposed to authorised users
 - **Role-based access control** — Teachers can only access their own student data; Admin role can access any teacher's students
-- **Swagger UI** — Interactive API documentation available in Development with Bearer token support
+- **Swagger UI** — Interactive API documentation available in Development with Bearer token support 
 
 ## Tech Stack
 
